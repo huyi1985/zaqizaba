@@ -7,9 +7,13 @@ class fd_set {
         $this->fds = $fds;
     }
     
-    public function addFd($fd) {
-        $this->fds[$fd];
-    }       
+    public function issetFd($fd) {
+        return array_search($fd, $this->fds) !== false;
+    }
+    
+    public function setFd($fd) {
+        $this->fds[] = $fd;
+    }
     
     public function getChangedFdSet() {
         $fds = $this->fds;
@@ -22,10 +26,22 @@ class fd_set {
     public function count() {
         return count($this->fds);
     }
+    
+    public function zero() {
+        $this->fds = [];
+    }
 }
 
 function FD_ISSET($fd, fd_set $fds) {
-    $fds->addFd($fd);
+    $fds->issetFd($fd);
+}
+
+function FD_SET($fd, fd_set $set) {
+    $set->setFd($fd);
+}
+
+function FD_ZERO(fd_set $fds) {
+    $fds->zero();
 }
 
 function select($nfds, fd_set &$readfds = null, fd_set &$writefds = null,
