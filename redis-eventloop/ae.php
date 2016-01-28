@@ -32,9 +32,21 @@ class aeEventLoop {
      */
     private $beforesleep;
     
-    public function __construct() {
+    public function __construct($setsize = 0) {
         $this->ae = new ae_select();
         $this->apidata = new ae_select_aeApiState();
+        
+        $this->aeCreateEventLoop($setsize);
+    }
+    
+    public function aeCreateEventLoop($setsize) {
+        // 初始化文件事件结构和已就绪文件事件结构数组
+        $this->events = array();
+        $this->fired = array();
+        
+        $this->setsize = $setsize;
+        $this->stop = false;
+        
     }
     
     public function aeSetBeforeSleepProc(Closure $beforesleep) {
@@ -58,6 +70,7 @@ class aeEventLoop {
     }
     
     public function aeProcessEvents($flags) {
+        // 先只处理文件事件
         $numevents = $this->ae->aeApiPoll($this, $tvp = 0);
         for ($j = 0; $j < $numevents; $j++) {
             
