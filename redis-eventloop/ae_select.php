@@ -13,12 +13,14 @@ class ae_select extends ae_abstract {
         $state->_wfds = $state->wfds;
         
         $retval = select($eventLoop->maxfd + 1, $state->_rfds, $state->_wfds);
-echo 'select() returns ', $retval, PHP_EOL;         
+echo 'select() returns ', $retval, $state, PHP_EOL;         
         if ($retval > 0) {
+echo 'maxfd = ', $eventLoop->maxfd, PHP_EOL;            
             for ($j = 0; $j <= $eventLoop->maxfd; $j++) {
                 $mask = 0;
                 
                 $fe = $eventLoop->events[$j];
+// echo $fe, PHP_EOL;                
                 if (FD_ISSET($j, $state->_rfds)) {
                     $mask |= ae::AE_READABLE;
                 }
@@ -33,10 +35,16 @@ echo 'select() returns ', $retval, PHP_EOL;
                 
                 $eventLoop->fired[$numevents] = $ffe;
                 $numevents++;
+// echo $ffe, PHP_EOL;                
             }
         }
+
+        return $numevents;
     }
     
+    /**
+     * called by aeCreateEventLoop()
+     */
     public function aeApiCreate(aeEventLoop $eventLoop) {
         $state = new ae_select_aeApiState();
         
@@ -74,5 +82,10 @@ class ae_select_aeApiState {
     public function __construct() {
         $this->rfds = new fd_set();
         $this->wfds = new fd_set();
+    }
+
+    public function __toString() {
+        return "\trfds: " . $this->_rfds
+                . "\t\twfds: " . $this->_wfds;
     }
 }

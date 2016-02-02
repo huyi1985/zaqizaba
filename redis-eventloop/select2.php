@@ -30,10 +30,14 @@ class fd_set {
     public function zero() {
         $this->fds = [];
     }
+
+    public function __toString() {
+        return '[' . implode(', ', $this->fds) . ']';
+    }
 }
 
 function FD_ISSET($fd, fd_set $fds) {
-    $fds->issetFd($fd);
+    return $fds->issetFd($fd);
 }
 
 function FD_SET($fd, fd_set $set) {

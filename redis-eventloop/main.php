@@ -25,7 +25,7 @@ $fd = 4;
 $el->aeCreateFileEvent($fd, ae::AE_READABLE, $acceptTcpHandler, NULL);
 
 $el->aeSetBeforeSleepProc(function() {
-    echo 'aeSetBeforeSleepProc', PHP_EOL;
+    // echo 'aeSetBeforeSleepProc', PHP_EOL;
 });
 
 $el->aeMain();

@@ -21,6 +21,7 @@ class aeEventLoop {
     
     public $maxfd = 1024;
     public $setsize;
+    public $lastTime;
     
     /**
      * @var array[aeFileEvent]
@@ -35,6 +36,10 @@ class aeEventLoop {
     public $fired = [];
     
     public $stop;
+
+    /**
+     * @var ae_select_aeApiState
+     */
     public $apidata;
     
     /**
@@ -51,10 +56,13 @@ class aeEventLoop {
     
     public function aeCreateEventLoop($setsize) {
         // 初始化文件事件结构和已就绪文件事件结构数组
-        $this->events = array();
-        $this->fired = array();
+        for ($i = 0; $i < $setsize; $i++) {
+            $this->events[$i] = new aeFileEvent();
+            $this->fired[$i] = new aeFiredEvent();
+        }
         
         $this->setsize = $setsize;
+        $this->lastTime = time();
         
         $this->stop = false;
         $this->maxfd = -1;
@@ -64,7 +72,6 @@ class aeEventLoop {
         
         // 初始化监听事件
         for ($i = 0; $i < $setsize; $i++) {
-            $this->events[$i] = new aeFileEvent();
             $this->events[$i]->mask = ae::AE_NONE;
         }
 
@@ -95,13 +102,38 @@ class aeEventLoop {
     public function aeProcessEvents($flags) {
         // 先只处理文件事件
         $numevents = $this->ae->aeApiPoll($this, $tvp = 0);
+echo __METHOD__, "\t", 'aeApiPoll() returns ', $numevents, PHP_EOL;        
         for ($j = 0; $j < $numevents; $j++) {
             
             /*@var $fe aeFileEvent*/
             $fe = $this->events[$this->fired[$j]->fd];
-                                   
-            $wfileProc = $fe->wfileProc;
-            $wfileProc();
+echo __METHOD__, "\t", 'fd = ', $this->fired[$j]->fd, "\t", $fe, PHP_EOL;
+// echo $this->fired[$j], PHP_EOL;
+
+            $mask = $this->fired[$j]->mask;
+            $fd = $this->fired[$j]->fd;
+            $rfired = false;
+
+           /* note the fe->mask & mask & ... code: maybe an already processed
+            * event removed an element that fired and we still didn't
+            * processed, so we check if the event is still valid. */
+            // 读事件
+            if ($fe->mask & $mask & ae::AE_READABLE) {
+                // rfired 确保读/写事件只能执行其中一个
+                $rfired = true;
+                $rfileProc = $fe->rfileProc;
+                $rfileProc($this, $fd, $fe->clientData, $mask);
+            }
+
+            // 写事件
+            if ($fe->mask & $mask & ae::AE_WRITABLE) {
+                if (!$rfired || $fe->wfileProc != $fe->rfileProc) {
+                    $wfileProc = $fe->wfileProc;
+                    $wfileProc($this, $fd, $fe->clientData, $mask);
+                }
+            }
+
+            
         }
     }
     
@@ -113,7 +145,7 @@ class aeEventLoop {
      * 根据 mask 参数的值，监听 fd 文件的状态，
      * 当 fd 可用时，执行 proc 函数
      */
-    public function aeCreateFileEvent($fd, $mask, $proc, $clientData) {
+    public function aeCreateFileEvent($fd, $mask, Closure $proc, $clientData) {
         // 取出文件事件结构
         $fe = $this->events[$fd];
         
@@ -125,7 +157,8 @@ class aeEventLoop {
         // 设置文件事件类型，以及事件的处理器
         $fe->mask |= $mask;
         if ($mask & ae::AE_READABLE) {
-            $fe->rfileProc = $proc;  
+echo 'Set rfileProc', PHP_EOL;            
+            $fe->rfileProc = $proc;
         }
         
         if ($mask & ae::AE_WRITABLE) {
@@ -139,7 +172,7 @@ class aeEventLoop {
         if ($fd > $this->maxfd) {
             $this->maxfd = $fd;
         }
-
+echo __METHOD__, "\t", 'fd = ', $fd, "\t", $fe, PHP_EOL;
         return true;
     }
 }
@@ -158,9 +191,19 @@ class aeFileEvent {
     public $wfileProc;
     
     public $clientData;
+
+    public function __toString() {
+        return 'FileEvent (mask: '. $this->mask
+                    . ')';
+    }
 }
 
 class aeFiredEvent {
     public $fd;
     public $mask;
+
+    public function __toString() {
+        return 'FiredFileEvent (fd: '. $this->fd
+                . ', mask: ' . $this->mask . ')';
+    }
 }
